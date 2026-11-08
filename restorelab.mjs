@@ -43,7 +43,7 @@ try {
     const port = Number(option ?? 4782);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Geçersiz port.');
     const selected = await profile(argument);
-    const server = servePanel(Array.isArray(selected) ? selected : [selected], state, port);
+    const server = servePanel(Array.isArray(selected) ? selected : [selected], state, port, process.env.RESTORELAB_LANG ?? 'tr');
     server.once('listening', () => console.log(`http://127.0.0.1:${server.address().port}/`));
     server.once('error', (error) => { console.error(error.message); process.exitCode = 1; });
   } else {

@@ -1,12 +1,18 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { withDemoApi } from '../demo/api.mjs';
 import { withDockerPostgres } from './docker.mjs';
 import { runDrill } from './history.mjs';
 import { withFixturePostgres } from './postgres.mjs';
 
-const schema = fileURLToPath(new URL('../demo/schema.sql', import.meta.url));
+const schema = new URL('../demo/schema.sql', import.meta.url);
+
+function withDemoDocker(use) {
+  return withDockerPostgres('postgres:16-alpine', async (db) => {
+    await db.psql(['-c', 'CREATE ROLE ayse LOGIN; CREATE ROLE bora LOGIN;']);
+    return use(db);
+  });
+}
 
 function result(label, english, response, expected, match, status = 200, expectation = 'exact') {
   return {
@@ -42,8 +48,9 @@ export async function runDemo(signal, { dockerState } = {}) {
   const fixtures = await mkdtemp('/tmp/restorelab-archives-');
   const backups = ['restricted.dump', 'permissive.dump'];
   try {
-    await withFixturePostgres(async (db) => {
-      await db.psql(['-f', schema]);
+    const prepare = dockerState ? withDemoDocker : withFixturePostgres;
+    await prepare(async (db) => {
+      await db.psql(['-c', await readFile(schema, 'utf8')]);
       await db.dump(join(fixtures, backups[0]));
       await db.psql(['-c', 'ALTER POLICY read_tasks ON tasks USING (true)']);
       await db.dump(join(fixtures, backups[1]));
@@ -56,8 +63,7 @@ export async function runDemo(signal, { dockerState } = {}) {
         const profile = {
           id: 'task-demo', title: 'Task demo', applicationVersion: 'demo-v1', suiteVersion: 'access-v1',
           backup: join(fixtures, backup), backupAt: new Date(backupAt + runs.length).toISOString(),
-          exercise: ({ restoreBackup }) => withDockerPostgres('postgres:16-alpine', async (db) => {
-            await db.psql(['-c', 'CREATE ROLE restorelab; CREATE ROLE ayse LOGIN; CREATE ROLE bora LOGIN;']);
+          exercise: ({ restoreBackup }) => withDemoDocker(async (db) => {
             await restoreBackup(db.restore);
             return verify(db);
           }),

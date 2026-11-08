@@ -1,48 +1,54 @@
 # RestoreLab
 
-[Türkçe](README.tr.md)
+[Türkçe](README.tr.md) · [Open the sample report](https://mehmetfatihdogan.com.tr/assets/demos/restorelab-en)
 
-Restore a PostgreSQL backup in a disposable environment and check what the application can actually do with the recovered data. RestoreLab records the newest tested backup and the newest passing backup for each application and check-suite version.
+You have a PostgreSQL backup. Which copy can you actually recover from, and what will work after you restore it? RestoreLab runs repeatable recovery drills on your machine or CI runner. It records the restore separately from application checks and shows the newest passing backup for a given application and test-suite version.
 
 ![Passing and failing application checks after both backups restore](docs/images/report-en.webp)
 
-## Try the recovery drill
+## Run the demo
 
-Requirements: Node.js 22+, PostgreSQL 16 tools on PATH, and a non-root account on macOS or Linux. Docker is needed for the container-backed demo and panel history.
-
-```sh
-node --test
-node restorelab.mjs demo "$HOME/Downloads/restorelab-demo" --docker
-node restorelab.mjs serve examples/demo-panel.mjs
-```
-
-Open the generated report or visit the loopback URL printed by the panel. Use a fresh output directory for each report. Omit `--docker` to run the synthetic comparison in temporary local PostgreSQL clusters.
-
-Both fixtures contain the same task rows and restore successfully. Both API reads return HTTP 200. The permissive policy exposes Ayşe’s task to Bora and fails the access check. The passing fixture also verifies that Bora can write and re-read a task.
-
-## Run your own drill
-
-A local JavaScript profile identifies the backup, its timestamp, the application version and the check-suite version. Its `exercise` starts the test environment, calls `restoreBackup` with the actual restore operation, then returns explicit expected/observed checks. See [the PostgreSQL profile](examples/postgres-profile.mjs) for a basic example and [the TaskWork exercise](examples/taskwork.mjs) for a Supabase integration.
+You need **Node.js 22+ and a running Docker engine** on macOS or Linux. Run as a regular user with Docker access.
 
 ```sh
-DRILL_BACKUP=/absolute/path/backup.dump DRILL_BACKUP_AT=2026-11-08T00:00:00Z \
-  node restorelab.mjs drill examples/postgres-profile.mjs
-node restorelab.mjs serve examples/postgres-profile.mjs
+git clone https://github.com/fatihdogann/restorelab.git
+cd restorelab
+report_dir=$(mktemp -d)
+export RESTORELAB_STATE="$report_dir/history"
+node restorelab.mjs demo "$report_dir" --docker
+RESTORELAB_LANG=en node restorelab.mjs serve examples/demo-panel.mjs
 ```
 
-The example expects a PostgreSQL custom archive and a `public.boards` table. Use a Docker image with the same PostgreSQL major version and required extensions. Profiles can provision required roles before restoring. Test with archives and profiles you trust. A PostgreSQL restore can execute code contained in the archive. The bundled Docker PostgreSQL helper uses a network-disabled, disposable container.
+Open `index.en.html` for the English report, or visit the loopback address printed by the panel. The demo builds two synthetic archives. Both restore and both task API reads return HTTP 200. One exposes another user’s task, so its access check fails. The command succeeds when it reproduces both expected outcomes.
 
-Run the `drill` command from cron, a systemd timer or CI for regular verification. An unsuccessful drill exits nonzero and keeps its result. Set `RESTORELAB_STATE` to choose the history directory, which defaults to `~/.local/state/restorelab`. The panel listens on loopback and reads that history. Only record synthetic identifiers or redacted values in the checks.
+For an HTML/JSON report without panel history, install PostgreSQL 16 command-line tools and run the demo without `--docker`.
 
-## TaskWork acceptance
+## Check your own backup
 
-With Docker and Supabase CLI 3.0 on PATH, run the following against a local TaskWork checkout.
+Start with a trusted custom-format archive created by `pg_dump -Fc`. Pick a table your application needs and set the backup timestamp and application version before running the starter profile.
 
 ```sh
-node examples/taskwork.mjs /absolute/path/TaskWork
+export DRILL_PROJECT_ID=inventory
+export DRILL_APP_VERSION=v1.2.0
+export DRILL_BACKUP=/absolute/path/inventory.dump
+export DRILL_BACKUP_AT=2026-11-08T00:00:00Z
+export DRILL_REQUIRED_TABLE=public.orders
+
+node restorelab.mjs drill examples/postgres-profile.mjs
+RESTORELAB_LANG=en node restorelab.mjs serve examples/postgres-profile.mjs
 ```
 
-This exercise applies TaskWork’s base schema from the checkout’s commit, creates two synthetic users in a local Supabase stack, and restores the resulting backup into a fresh stack. It checks password sign-in, card reads, user isolation and a write followed by a read via Supabase Auth and REST. Its scope is the database and API path on the base schema. The complete migration chain, Storage and the mobile/web client are separate acceptance paths.
+Use a lowercase, schema-qualified table name. The starter verifies that the table is present in the restored database. Choose a PostgreSQL image matching your backup’s major version and extensions with `DRILL_POSTGRES_IMAGE` if needed. The starter omits original owners and grants for its table check. If you need to verify access rules, provision the application’s roles in your profile and use the Docker helper’s default restore behavior, which preserves owners and grants.
+
+To go further, copy the [starter profile](examples/postgres-profile.mjs) and replace its table check with an invariant that matters to your application, such as an authenticated read or a cross-user access check. An `exercise` calls `restoreBackup` with the actual restore operation and returns explicit expected and observed results. Change the suite version when you change what the profile tests.
+
+## Run it regularly
+
+Call `drill` from cron, a systemd timer, or CI. A failed drill exits nonzero and keeps its result. Set `RESTORELAB_STATE` to choose a private history directory. It defaults to `~/.local/state/restorelab`. The panel listens on loopback and reads this history.
+
+Use trusted archives and trusted JavaScript profiles. [PostgreSQL restores can execute SQL and code from the source database](https://www.postgresql.org/docs/current/app-pgrestore.html). The bundled PostgreSQL helper uses a network-disabled Docker container and removes it after each drill. Keep backup files and history private and record only synthetic identifiers or redacted values in checks.
+
+See the [Supabase Auth and REST case study](docs/supabase-case-study.md) for a fuller example that restores synthetic accounts and exercises application access over HTTP.
 
 ## License
 
@@ -50,6 +56,9 @@ This exercise applies TaskWork’s base schema from the checkout’s commit, cre
 
 ## Developer
 
-**Mehmet Fatih Doğan** — software developer.
+**Mehmet Fatih Doğan** — Software Developer.
 
-[Portfolio & contact](https://mehmetfatihdogan.com.tr/en/) · [GitHub](https://github.com/fatihdogann)
+- 🌐 Portfolio & Contact: [mehmetfatihdogan.com.tr](https://mehmetfatihdogan.com.tr)
+- 💻 GitHub: [@fatihdogann](https://github.com/fatihdogann)
+
+For questions, bug reports, or feedback about this project, feel free to contact me through [my website](https://mehmetfatihdogan.com.tr).

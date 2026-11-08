@@ -37,3 +37,31 @@ test('the loopback panel exposes only the selected project and escapes report ob
     await rm(state, { recursive: true, force: true });
   }
 });
+
+test('the English panel localizes the overview and the drill report', async () => {
+  const state = await mkdtemp('/tmp/restorelab-panel-en-');
+  const profile = { id: 'demo', title: 'Demo', applicationVersion: 'v1', suiteVersion: 'v1' };
+  const server = servePanel([profile], state, 0, 'en');
+  try {
+    await once(server, 'listening');
+    const url = 'http://127.0.0.1:' + server.address().port;
+    const overview = await (await fetch(url)).text();
+    assert.match(overview, /<html lang="en">/);
+    assert.match(overview, /Newest passing backup/);
+    const backup = join(state, 'synthetic.dump');
+    await writeFile(backup, 'dummy archive');
+    const run = await runDrill({
+      ...profile, backup, backupAt: '2026-11-08T00:00:00Z',
+      async exercise({ restoreBackup }) {
+        await restoreBackup(async () => {});
+        return [{ label: 'Kontrol', english: 'Check', expected: ['ok'], observed: ['ok'], passed: true }];
+      },
+    }, state);
+    const detail = await (await fetch(url + '/runs/' + run.id)).text();
+    assert.match(detail, /Back to drills/);
+    assert.match(detail, /<h3>Check<\/h3>/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(state, { recursive: true, force: true });
+  }
+});
