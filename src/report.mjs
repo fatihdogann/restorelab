@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { describeFailure } from './diagnostics.mjs';
 
 const css = readFileSync(new URL('./report.css', import.meta.url), 'utf8');
 export const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -34,6 +35,7 @@ function renderRun(run, index, lang, strings) {
   const restored = run.restore === 'passed';
   const restoreText = restored ? strings.restore : run.restore === 'failed' ? strings.restoreFailed : strings.notRestored;
   const heading = passed ? strings.passed : restored ? strings.failed : restoreText;
+  const diagnostic = run.checks.length ? '' : describeFailure(run, lang);
   const duration = new Intl.NumberFormat(lang === 'tr' ? 'tr-TR' : 'en-US');
   const rows = run.checks.map((check) => `
     <li class="check${check.passed ? '' : ' failed-check'}">
@@ -52,6 +54,7 @@ function renderRun(run, index, lang, strings) {
         ${run.restoreMs === null ? '' : `<span class="duration">${duration.format(run.restoreMs)} ms</span>`}
       </div>
       <div class="restore"><span class="status-icon ${restored ? 'pass' : 'fail'}">${icon(restored)}</span> ${restoreText}</div>
+      ${diagnostic ? `<p class="empty">${escapeHtml(diagnostic)}</p>` : ''}
       ${rows ? `<ul class="checks">${rows}</ul>` : ''}
     </article>`;
 }

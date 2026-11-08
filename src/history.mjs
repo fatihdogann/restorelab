@@ -68,8 +68,16 @@ export async function runDrill(profile, state, signal = new AbortController().si
         record.failure = null;
       }
     }
-  } catch {
-    if (signal.aborted) record.failure = 'interrupted';
+  } catch (error) {
+    if (signal.aborted) {
+      record.failure = 'interrupted';
+    } else if (record.failure === 'backup' && error?.code === 'ENOENT') {
+      record.diagnostic = 'backup-missing';
+    } else if (record.failure === 'backup' && ['EACCES', 'EPERM'].includes(error?.code)) {
+      record.diagnostic = 'backup-denied';
+    } else if (record.failure === 'setup' && error?.code === 'ENOENT' && error.syscall === 'spawn docker') {
+      record.diagnostic = 'docker-missing';
+    }
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

@@ -36,3 +36,23 @@ test('history retains a failed restore and finds the newest passing backup for t
     await rm(state, { recursive: true, force: true });
   }
 });
+
+test('a missing backup has a safe diagnostic in history and the report', async () => {
+  const state = await mkdtemp('/tmp/restorelab-missing-');
+  try {
+    const result = await runDrill({
+      id: 'sample', title: 'Sample', applicationVersion: 'v1', suiteVersion: 'v1',
+      backup: join(state, 'missing.dump'), backupAt: '2026-11-08T00:00:00Z',
+      async exercise() { assert.fail('Setup must not run'); },
+    }, state);
+    assert.equal(result.diagnostic, 'backup-missing');
+    assert.equal(result.restore, 'not-run');
+    const [stored] = await loadHistory(state);
+    assert.equal(stored.diagnostic, 'backup-missing');
+    assert.ok(!JSON.stringify(stored).includes(state));
+    const { renderReport } = await import('../src/report.mjs');
+    assert.match(renderReport({ recordedAt: stored.recordedAt, runs: [stored] }, { lang: 'en' }), /Backup file could not be found/);
+  } finally {
+    await rm(state, { recursive: true, force: true });
+  }
+});

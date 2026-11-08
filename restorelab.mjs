@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { describeFailure } from './src/diagnostics.mjs';
 import { runDemo } from './src/drill.mjs';
 import { runDrill } from './src/history.mjs';
 import { servePanel } from './src/panel.mjs';
@@ -38,7 +39,11 @@ try {
   } else if (command === 'drill' && argument && !option) {
     const report = await runDrill(await profile(argument), state, interruption.signal);
     console.log(`${report.id} · ${report.status}${report.failure ? ` · ${report.failure}` : ''}`);
-    if (report.status !== 'passed') process.exitCode = 1;
+    if (report.status !== 'passed') {
+      const diagnostic = describeFailure(report, process.env.RESTORELAB_LANG);
+      if (diagnostic) console.error(diagnostic);
+      process.exitCode = 1;
+    }
   } else if (command === 'serve' && argument && !extra.length) {
     const port = Number(option ?? 4782);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Geçersiz port.');
