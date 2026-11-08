@@ -4,7 +4,10 @@
 
 Bir PostgreSQL yedeğini geri yüklediğinde uygulamanın hangi işlevleri çalışacak? RestoreLab, kendi makinen veya CI ortamında geri yükleme tatbikatı çalıştırır. Geri yükleme ile uygulama testlerini ayrı kaydeder ve uygulama ile test paketi sürümü başına testleri geçen en yeni yedeği gösterir.
 
-![İki yedek geri yüklendikten sonra başarılı ve başarısız uygulama kontrolleri](docs/images/report-tr.webp)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/report-tr-light.webp">
+  <img src="docs/images/report-tr.webp" alt="İki yedek de açılıyor; yalnızca geniş erişimli yedek Bora’ya Ayşe’nin görevini gösteriyor">
+</picture>
 
 ## Örnek tatbikat
 

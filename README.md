@@ -4,7 +4,10 @@
 
 You have a PostgreSQL backup. Which copy can you actually recover from, and what will work after you restore it? RestoreLab runs repeatable recovery drills on your machine or CI runner. It records the restore separately from application checks and shows the newest passing backup for a given application and test-suite version.
 
-![Passing and failing application checks after both backups restore](docs/images/report-en.webp)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/report-en-light.webp">
+  <img src="docs/images/report-en.webp" alt="After both restores, the API returns HTTP 200; only the permissive backup exposes another user’s task">
+</picture>
 
 ## Run the demo
 

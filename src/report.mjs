@@ -14,7 +14,10 @@ const copy = {
     failed: 'Uygulama testi başarısız', expected: 'Beklenen', observed: 'Gözlenen',
     empty: 'Boş', visible: ' görünür', restore: 'PostgreSQL yedeği geri yüklendi',
     restoreFailed: 'Geri yükleme başarısız', notRestored: 'Geri yükleme yapılmadı',
-    runs: 'Tatbikatlar', back: 'Tatbikatlara dön',
+    back: 'Tatbikatlara dön',
+    comparison: 'İki yedek açıldı. Biri yetki testini geçemedi.',
+    compareLead: 'Bora kendi görevlerini istedi. İki yanıtta da HTTP 200 var; yalnız birinde Ayşe’nin görevi de dönüyor.',
+    archive: 'Yedek', response: 'API yanıtı', result: 'Yetki testi', detail: 'Tüm kontroller',
   },
   en: {
     title: 'Recovery report', demo: 'Synthetic example', live: 'Drill record',
@@ -23,7 +26,10 @@ const copy = {
     failed: 'Application check failed', expected: 'Expected', observed: 'Observed',
     empty: 'Empty', visible: ' is visible', restore: 'PostgreSQL backup restored',
     restoreFailed: 'Restore failed', notRestored: 'Restore did not run',
-    runs: 'Drills', back: 'Back to drills',
+    back: 'Back to drills',
+    comparison: 'Both backups restored. One failed the access check.',
+    compareLead: 'Bora requested his own tasks. Both responses returned HTTP 200; only one also returned Ayşe’s task.',
+    archive: 'Backup', response: 'API response', result: 'Access check', detail: 'All checks',
   },
 };
 const path = (passed) => passed ? '<path d="m5 12 4 4 10-10"/>' : '<path d="m7 7 10 10M17 7 7 17"/>';
@@ -72,10 +78,28 @@ export function htmlPage(lang, title, badge, body) {
 <body>
 <header class="shell masthead"><span class="brand">${mark} RestoreLab</span><span class="sample">${escapeHtml(badge)}</span></header>
 <main class="shell">
-${body}
+${body.replace(/[ \t]+$/gm, '')}
 </main>
 </body>
 </html>`;
+}
+
+function renderComparison(runs, strings) {
+  const checkIndex = runs.find(run => run.status === 'failed')?.checks.findIndex(check => !check.passed) ?? -1;
+  if (checkIndex < 0 || runs.some(run => !run.checks[checkIndex])) return '';
+  return `<section class="comparison" aria-labelledby="comparison-title">
+    <h2 id="comparison-title">${strings.comparison}</h2>
+    <p>${strings.compareLead}</p>
+    <table>
+      <thead><tr><th scope="col">${strings.archive}</th><th scope="col">${strings.response}</th><th scope="col">${strings.result}</th></tr></thead>
+      <tbody>${runs.map((run, index) => {
+        const check = run.checks[checkIndex];
+        return `<tr><th scope="row"><a href="#run-${index}"><code>${escapeHtml(run.backup)}</code></a></th>
+          <td><span class="http">HTTP ${escapeHtml(check.httpStatus)}</span> <code>${escapeHtml(check.observed.join(', '))}</code></td>
+          <td class="${check.passed ? 'pass' : 'fail'}">${check.passed ? strings.pass : strings.fail}</td></tr>`;
+      }).join('')}</tbody>
+    </table>
+  </section>`;
 }
 
 export function renderReport(report, { lang = 'tr', live = false } = {}) {
@@ -92,7 +116,6 @@ export function renderReport(report, { lang = 'tr', live = false } = {}) {
       <div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(details)}</p></div>
       <time datetime="${escapeHtml(report.recordedAt)}">${date.format(new Date(report.recordedAt))} UTC</time>
     </div>
-    ${live ? '' : `<nav aria-label="${strings.runs}">${report.runs.map((run, index) =>
-      `<a href="#run-${index}">${escapeHtml(run.backup)} <span class="${run.status === 'passed' ? 'pass' : 'fail'}">${run.status === 'passed' ? strings.pass : strings.fail}</span></a>`).join('')}</nav>`}
+    ${live ? '' : `${renderComparison(report.runs, strings)}<h2 class="detail-title">${strings.detail}</h2>`}
     <div class="runs${live ? ' single-run' : ''}">${report.runs.map((run, index) => renderRun(run, index, lang, strings)).join('')}</div>`);
 }
