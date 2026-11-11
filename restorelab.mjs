@@ -36,9 +36,16 @@ try {
     const expectedFailure = exposed?.httpStatus === 200 && exposed.observed.includes('ayse-task') &&
       permissive.checks.every((check, index) => check.passed === expectedChecks[index]);
     if (restricted.status !== 'passed' || !expectedFailure) process.exitCode = 1;
-  } else if (command === 'drill' && argument && !option) {
+  } else if (command === 'drill' && argument &&
+    (option === undefined || (option === '--report' && extra.length === 1 && extra[0]))) {
+    const lang = process.env.RESTORELAB_LANG ?? 'tr';
+    if (option && lang !== 'tr' && lang !== 'en') throw new Error('RESTORELAB_LANG must be tr or en.');
     const report = await runDrill(await profile(argument), state, interruption.signal);
     console.log(`${report.id} · ${report.status}${report.failure ? ` · ${report.failure}` : ''}`);
+    if (option) {
+      const html = renderReport({ recordedAt: report.recordedAt, runs: [report] }, { lang, live: true, standalone: true });
+      await writeFile(resolve(extra[0]), html, { mode: 0o600, flag: 'wx' });
+    }
     if (report.status !== 'passed') {
       const diagnostic = describeFailure(report, process.env.RESTORELAB_LANG);
       if (diagnostic) console.error(diagnostic);
@@ -52,7 +59,7 @@ try {
     server.once('listening', () => console.log(`http://127.0.0.1:${server.address().port}/`));
     server.once('error', (error) => { console.error(error.message); process.exitCode = 1; });
   } else {
-    console.error('Kullanım: node restorelab.mjs demo [dizin] [--docker] | drill <profil.mjs> | serve <profil.mjs> [port]');
+    console.error('Kullanım: node restorelab.mjs demo [dizin] [--docker] | drill <profil.mjs> [--report <yeni-dosya.html>] | serve <profil.mjs> [port]');
     process.exitCode = 2;
   }
 } catch (error) {

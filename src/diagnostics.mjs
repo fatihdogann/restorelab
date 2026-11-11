@@ -13,3 +13,22 @@ export function describeFailure(record, lang = 'en') {
   const key = record.diagnostic ?? record.failure;
   return Object.hasOwn(messages, key) ? messages[key][lang === 'tr' ? 0 : 1] : '';
 }
+
+const stages = {
+  passed: ['Uygulama testleri geçti', 'Application checks passed'],
+  backup: ['Yedek hazırlanamadı', 'Backup preparation failed'],
+  setup: ['Test ortamı başlatılamadı', 'Test environment could not start'],
+  restore: ['Geri yükleme başarısız', 'Restore failed'],
+  checks: ['Uygulama testi başarısız', 'Application check failed'],
+  incomplete: ['Uygulama testleri tamamlanamadı', 'Application checks did not finish'],
+  interrupted: ['Tatbikat kesildi', 'Drill interrupted'],
+  failed: ['Tatbikat başarısız', 'Drill failed'],
+};
+
+export function describeStage(record, lang = 'en') {
+  const failure = record.failure ?? (record.restore === 'passed' ? 'checks' : 'restore');
+  const key = record.status === 'passed' ? 'passed'
+    : failure === 'checks' && !record.checks?.length ? 'incomplete'
+    : failure;
+  return (Object.hasOwn(stages, key) ? stages[key] : stages.failed)[lang === 'tr' ? 0 : 1];
+}

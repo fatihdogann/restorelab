@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describeFailure } from './diagnostics.mjs';
+import { describeFailure, describeStage } from './diagnostics.mjs';
 
 const css = readFileSync(new URL('./report.css', import.meta.url), 'utf8');
 export const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
@@ -10,26 +10,26 @@ const copy = {
   tr: {
     title: 'Kurtarma raporu', demo: 'Sentetik örnek', live: 'Tatbikat kaydı',
     intro: 'Görev uygulaması · PostgreSQL · İki kullanıcıyla erişim kontrolü',
-    pass: 'Geçti', fail: 'Başarısız', passed: 'Uygulama testleri geçti',
-    failed: 'Uygulama testi başarısız', expected: 'Beklenen', observed: 'Gözlenen',
+    pass: 'Geçti', fail: 'Başarısız', expected: 'Beklenen', observed: 'Gözlenen',
+    restored: 'Geri yüklendi', restoreTime: 'Geri yükleme süresi', pending: 'Çalışmadı',
     empty: 'Boş', visible: ' görünür', restore: 'PostgreSQL yedeği geri yüklendi',
     restoreFailed: 'Geri yükleme başarısız', notRestored: 'Geri yükleme yapılmadı',
     back: 'Tatbikatlara dön',
     comparison: 'İki yedek açıldı. Biri yetki testini geçemedi.',
-    compareLead: 'Bora kendi görevlerini istedi. İki yanıtta da HTTP 200 var; yalnız birinde Ayşe’nin görevi de dönüyor.',
-    archive: 'Yedek', response: 'API yanıtı', result: 'Yetki testi', detail: 'Tüm kontroller',
+    compareLead: 'Bora kendi görevlerini istedi. API iki seferde de HTTP 200 döndürdü. Geniş erişim kuralı Ayşe’nin görevini de gösterdi.',
+    archive: 'Yedek', restoreColumn: 'Geri yükleme', response: 'Bora’nın API yanıtı', result: 'Yetki testi', detail: 'Tüm kontroller',
   },
   en: {
     title: 'Recovery report', demo: 'Synthetic example', live: 'Drill record',
     intro: 'Task application · PostgreSQL · Two-user access test',
-    pass: 'Passed', fail: 'Failed', passed: 'Application checks passed',
-    failed: 'Application check failed', expected: 'Expected', observed: 'Observed',
+    pass: 'Passed', fail: 'Failed', expected: 'Expected', observed: 'Observed',
+    restored: 'Restored', restoreTime: 'Restore time', pending: 'Did not run',
     empty: 'Empty', visible: ' is visible', restore: 'PostgreSQL backup restored',
     restoreFailed: 'Restore failed', notRestored: 'Restore did not run',
     back: 'Back to drills',
     comparison: 'Both backups restored. One failed the access check.',
-    compareLead: 'Bora requested his own tasks. Both responses returned HTTP 200; only one also returned Ayşe’s task.',
-    archive: 'Backup', response: 'API response', result: 'Access check', detail: 'All checks',
+    compareLead: 'Bora requested his own tasks. The API returned HTTP 200 both times. The permissive policy also exposed Ayşe’s task.',
+    archive: 'Backup', restoreColumn: 'Restore', response: 'Bora’s API response', result: 'Access check', detail: 'All checks',
   },
 };
 const path = (passed) => passed ? '<path d="m5 12 4 4 10-10"/>' : '<path d="m7 7 10 10M17 7 7 17"/>';
@@ -40,7 +40,8 @@ function renderRun(run, index, lang, strings) {
   const passed = run.status === 'passed';
   const restored = run.restore === 'passed';
   const restoreText = restored ? strings.restore : run.restore === 'failed' ? strings.restoreFailed : strings.notRestored;
-  const heading = passed ? strings.passed : restored ? strings.failed : restoreText;
+  const heading = describeStage(run, lang);
+  const restoreState = restored ? 'pass' : run.restore === 'failed' ? 'fail' : 'muted';
   const diagnostic = run.checks.length ? '' : describeFailure(run, lang);
   const duration = new Intl.NumberFormat(lang === 'tr' ? 'tr-TR' : 'en-US');
   const rows = run.checks.map((check) => `
@@ -57,9 +58,9 @@ function renderRun(run, index, lang, strings) {
     <article id="run-${index}" aria-labelledby="title-${index}">
       <div class="run-heading">
         <div><code>${escapeHtml(run.backup)}</code><h2 id="title-${index}" class="${passed ? 'pass' : 'fail'}">${heading}</h2></div>
-        ${run.restoreMs === null ? '' : `<span class="duration">${duration.format(run.restoreMs)} ms</span>`}
+        ${Number.isFinite(run.restoreMs) ? `<p class="duration"><span>${strings.restoreTime}</span><strong>${duration.format(run.restoreMs)} ms</strong></p>` : ''}
       </div>
-      <div class="restore"><span class="status-icon ${restored ? 'pass' : 'fail'}">${icon(restored)}</span> ${restoreText}</div>
+      <div class="restore"><span class="status-icon ${restoreState}">${run.restore === 'not-run' ? '' : icon(restored)}</span> ${restoreText}</div>
       ${diagnostic ? `<p class="empty">${escapeHtml(diagnostic)}</p>` : ''}
       ${rows ? `<ul class="checks">${rows}</ul>` : ''}
     </article>`;
@@ -87,22 +88,29 @@ ${body.replace(/[ \t]+$/gm, '')}
 function renderComparison(runs, strings) {
   const checkIndex = runs.find(run => run.status === 'failed')?.checks.findIndex(check => !check.passed) ?? -1;
   if (checkIndex < 0 || runs.some(run => !run.checks[checkIndex])) return '';
-  return `<section class="comparison" aria-labelledby="comparison-title">
-    <h2 id="comparison-title">${strings.comparison}</h2>
-    <p>${strings.compareLead}</p>
+  return `<section class="comparison" aria-labelledby="report-title">
     <table>
-      <thead><tr><th scope="col">${strings.archive}</th><th scope="col">${strings.response}</th><th scope="col">${strings.result}</th></tr></thead>
+      <thead><tr><th scope="col">${strings.archive}</th><th class="restore-column" scope="col">${strings.restoreColumn}</th><th scope="col">${strings.response}</th><th scope="col">${strings.result}</th></tr></thead>
       <tbody>${runs.map((run, index) => {
         const check = run.checks[checkIndex];
-        return `<tr><th scope="row"><a href="#run-${index}"><code>${escapeHtml(run.backup)}</code></a></th>
-          <td><span class="http">HTTP ${escapeHtml(check.httpStatus)}</span> <code>${escapeHtml(check.observed.join(', '))}</code></td>
-          <td class="${check.passed ? 'pass' : 'fail'}">${check.passed ? strings.pass : strings.fail}</td></tr>`;
+        const response = check.observed.map((value) => {
+          const safe = escapeHtml(value);
+          return check.expected.includes(value) ? safe : `<mark>${safe}</mark>`;
+        }).join(', ');
+        const restoreStatus = run.restore === 'passed' ? strings.restored
+          : run.restore === 'failed' ? strings.restoreFailed : strings.pending;
+        const archive = escapeHtml(run.backup).replace(/\.dump$/, '<wbr>.dump');
+        return `<tr><th scope="row"><a href="#run-${index}"><code>${archive}</code></a>
+          <span class="mobile-restore">${restoreStatus}</span></th>
+          <td class="restore-column">${restoreStatus}</td>
+          <td><span class="http">HTTP ${escapeHtml(check.httpStatus)}</span><code>${response}</code></td>
+          <td><span class="verdict ${check.passed ? 'pass' : 'fail'}">${icon(check.passed)}${check.passed ? strings.pass : strings.fail}</span></td></tr>`;
       }).join('')}</tbody>
     </table>
   </section>`;
 }
 
-export function renderReport(report, { lang = 'tr', live = false } = {}) {
+export function renderReport(report, { lang = 'tr', live = false, standalone = false } = {}) {
   const strings = copy[lang];
   const date = new Intl.DateTimeFormat(lang === 'tr' ? 'tr-TR' : 'en-GB', {
     dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
@@ -110,12 +118,15 @@ export function renderReport(report, { lang = 'tr', live = false } = {}) {
   const title = live ? report.runs[0].title : strings.title;
   const details = live
     ? `${report.runs[0].applicationVersion} · ${report.runs[0].suiteVersion}` : strings.intro;
+  const comparison = live ? '' : renderComparison(report.runs, strings);
   return htmlPage(lang, title, live ? strings.live : strings.demo, `
-    ${live ? `<p class="back"><a href="/">${strings.back}</a></p>` : ''}
-    <div class="intro">
-      <div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(details)}</p></div>
+    ${live && !standalone ? `<p class="back"><a href="/">${strings.back}</a></p>` : ''}
+    <header class="intro${comparison ? ' demo-intro' : ''}">
+      <div><h1 id="report-title">${escapeHtml(comparison ? strings.comparison : title)}</h1>
+      <p>${escapeHtml(comparison ? strings.compareLead : details)}</p></div>
       <time datetime="${escapeHtml(report.recordedAt)}">${date.format(new Date(report.recordedAt))} UTC</time>
-    </div>
-    ${live ? '' : `${renderComparison(report.runs, strings)}<h2 class="detail-title">${strings.detail}</h2>`}
+    </header>
+    ${comparison}
+    ${live ? '' : `<h2 class="detail-title">${strings.detail}</h2>`}
     <div class="runs${live ? ' single-run' : ''}">${report.runs.map((run, index) => renderRun(run, index, lang, strings)).join('')}</div>`);
 }

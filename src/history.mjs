@@ -103,7 +103,7 @@ export async function loadHistory(state) {
 export function summarize(history, profile) {
   const comparable = history.filter((run) => run.project === profile.id &&
     run.applicationVersion === profile.applicationVersion && run.suiteVersion === profile.suiteVersion);
-  comparable.sort((a, b) => b.backupAt.localeCompare(a.backupAt) || b.recordedAt.localeCompare(a.recordedAt));
+  comparable.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
   const seen = new Set();
   const latestPerBackup = comparable.filter((run) => {
     const key = run.backupHash ?? run.id;
@@ -111,5 +111,6 @@ export function summarize(history, profile) {
     seen.add(key);
     return true;
   });
-  return { latest: comparable[0], lastPassing: latestPerBackup.find((run) => run.status === 'passed') };
+  latestPerBackup.sort((a, b) => b.backupAt.localeCompare(a.backupAt));
+  return { latest: latestPerBackup[0], lastPassing: latestPerBackup.find((run) => run.status === 'passed') };
 }

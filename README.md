@@ -26,6 +26,8 @@ Open `index.en.html` for the English report, or visit the loopback address print
 
 For an HTML/JSON report without panel history, install PostgreSQL 16 command-line tools and run the demo without `--docker`.
 
+See the [reproducible user-isolation case study](docs/recovery-case-study.md) for the request and expected results.
+
 ## Check your own backup
 
 Start with a trusted custom-format archive created by `pg_dump -Fc`. Pick a table your application needs and set the backup timestamp and application version before running the starter profile.
@@ -81,6 +83,20 @@ The second drill exits with code 1 because the paid order has no reservation. Op
 ## Run it regularly
 
 Call `drill` from cron, a systemd timer, or CI. A failed drill exits nonzero and keeps its result. Set `RESTORELAB_STATE` to choose a private history directory. It defaults to `~/.local/state/restorelab`. The panel listens on loopback and reads this history.
+
+To keep a standalone HTML record, add `--report /private/path/new-report.html`. RestoreLab writes it with owner-only permissions for successful and failed drills and refuses to overwrite an existing file. The panel shows the failure stage, when the last drill ran and how old the newest passing backup is.
+
+For a weekly job, save a private environment file with the profile variables and a private `RESTORELAB_STATE`. Have the backup job supply the selected archive and its actual creation time. Put this command in a script called by cron or your CI scheduler. The runner can use the exit code to flag a failure.
+
+```sh
+set -eu
+. /private/restorelab.env
+cd /path/to/restorelab
+run_dir=$(mktemp -d /private/reports/restorelab.XXXXXX)
+RESTORELAB_LANG=en node restorelab.mjs drill examples/sql-profile.mjs --report "$run_dir/report.html"
+```
+
+The environment file must export the variables. Create the private reports directory first and make Node.js and Docker available to the runner. Keep it on the runner or in access-controlled storage.
 
 Use trusted archives and trusted JavaScript profiles. [PostgreSQL restores can execute SQL and code from the source database](https://www.postgresql.org/docs/current/app-pgrestore.html). The bundled PostgreSQL helper uses a network-disabled Docker container and removes it after each drill. Keep backup files and history private and record only synthetic identifiers or redacted values in checks.
 

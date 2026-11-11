@@ -56,3 +56,14 @@ test('a missing backup has a safe diagnostic in history and the report', async (
     await rm(state, { recursive: true, force: true });
   }
 });
+
+test('a failed retry supersedes an earlier success even if the archive date was corrected', () => {
+  const profile = { id: 'inventory', applicationVersion: 'v1', suiteVersion: 'v1' };
+  const original = { project: profile.id, applicationVersion: 'v1', suiteVersion: 'v1',
+    id: 'first', backupHash: 'same', backupAt: '2026-11-11', recordedAt: '2026-11-11T01:00:00Z', status: 'passed' };
+  const retry = { ...original, id: 'retry', backupAt: '2026-11-10', recordedAt: '2026-11-11T02:00:00Z', status: 'failed' };
+  const older = { ...original, id: 'older', backupHash: 'different', backupAt: '2026-11-09' };
+  const summary = summarize([original, retry, older], profile);
+  assert.equal(summary.latest.id, retry.id);
+  assert.equal(summary.lastPassing.id, older.id);
+});

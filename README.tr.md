@@ -24,6 +24,8 @@ node restorelab.mjs serve examples/demo-panel.mjs
 
 Türkçe rapor için `index.html` dosyasını veya terminaldeki yerel panel adresini aç. İki sentetik yedek de geri yüklenir ve görev API’si HTTP 200 döner. Erişim politikası fazla geniş olan yedekte bir kullanıcı diğerinin görevini de görür ve yetki testi başarısız olur. Yalnız HTML ve JSON raporu için yerel PostgreSQL 16 araçlarıyla demoyu `--docker` olmadan çalıştırabilirsin.
 
+İsteği ve beklenen sonuçları [kullanıcı izolasyonu vakasında](docs/kurtarma-vakasi.md) görebilirsin.
+
 ## Kendi yedeğini sına
 
 `pg_dump -Fc` ile alınmış, güvendiğin bir yedek ve uygulamanın ihtiyaç duyduğu bir tablo seç.
@@ -77,6 +79,22 @@ node restorelab.mjs serve examples/sql-profile.mjs
 ```
 
 İkinci tatbikat, ödenmiş siparişin rezervasyonu eksik olduğu için 1 koduyla çıkar. Son denenen ve son geçen yedeği panelde yan yana görebilirsin.
+
+## Düzenli tatbikat ve özel rapor
+
+Bağımsız HTML çıktısı için komuta `--report /ozel/dizin/yeni-rapor.html` ekle. Başarılı ve başarısız tatbikatın raporu yalnız dosya sahibinin erişebileceği izinle yazılır. Var olan bir raporun üzerine yazılmaz. Panel, hatanın aşamasını, son tatbikatı ve son geçen yedeğin yaşını gösterir.
+
+Haftalık çalıştırmak için profil değişkenlerini ve özel bir `RESTORELAB_STATE` yolunu bir ortam dosyasında dışa aktar. Yedekleme işi, arşiv yolunu ve gerçek oluşturulma zamanını bu işe sağlasın. Aşağıdaki komutu cron veya CI zamanlayıcısının çağırdığı bir betiğe koy. İş, çıkış kodundan başarısızlığı anlayabilir.
+
+```sh
+set -eu
+. /ozel/restorelab.env
+cd /mutlak/yol/restorelab
+run_dir=$(mktemp -d /ozel/raporlar/restorelab.XXXXXX)
+node restorelab.mjs drill examples/sql-profile.mjs --report "$run_dir/rapor.html"
+```
+
+Raporların üst dizinini önceden oluştur. Node.js ve Docker komutları zamanlayıcının PATH ayarında bulunmalı. Yedekleri ve raporları erişimi kısıtlı bir ortamda sakla.
 
 ## Lisans
 
