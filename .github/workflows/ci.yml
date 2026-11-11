@@ -17,11 +17,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Test native PostgreSQL and the report
+      - name: Test PostgreSQL, reports and the Docker inventory drill
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y postgresql-16
-          PATH="/usr/lib/postgresql/16/bin:$PATH" node --test
+          PATH="/usr/lib/postgresql/16/bin:$PATH" RESTORELAB_TEST_DOCKER=1 node --test
       - name: Rehearse both access policies in Docker
         run: |
           output="$RUNNER_TEMP/restorelab-ci"

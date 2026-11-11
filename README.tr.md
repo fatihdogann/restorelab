@@ -45,6 +45,39 @@ node restorelab.mjs serve examples/postgres-profile.mjs
 
 Daha kapsamlı bir örnek için [Supabase Auth ve REST vaka çalışmasına](docs/supabase-case-study.md) bakabilirsin.
 
+## Kendi yedeğinde iş kurallarını sına
+
+[Stok test paketini](examples/inventory-checks.json) kopyala ve SQL ifadelerini uygulamanın kurallarıyla değiştir. Örneğin ödemesi alınan her siparişin stok rezervasyonu olmalı. Önceki bölümdeki ortam değişkenlerine test paketi yolunu ekle ve SQL profilini çalıştır.
+
+```sh
+export DRILL_SQL_SUITE=/mutlak/yol/inventory-checks.json
+node restorelab.mjs drill examples/sql-profile.mjs
+node restorelab.mjs serve examples/sql-profile.mjs
+```
+
+Her kontrolde `label`, isteğe bağlı `english` ve noktalı virgül içermeyen tek bir boolean `sql` ifadesi bulunur. En fazla 20 kontrol, beş saniye sorgu zaman aşımıyla ayrı salt okunur işlemlerde çalışır. Yalnızca `true` geçer. False, NULL ve SQL hataları başarısız sayılır. Sorgu metni ve satır verileri rapora yazılmaz. Testler veya Docker imaj adı değiştiğinde yeni bir test paketi geçmişi başlar. Koşumlar arasında imajın sabit kalması gerekiyorsa imaj özetini kullan.
+
+SQL profili arşivdeki sahiplik ve izinleri atlar. Veri kurallarını konteynerin PostgreSQL yöneticisiyle kontrol eder. Yetki, oturum açma, API veya yazma kontrolleri için uygulama rollerini kullanan özel bir profil hazırla.
+
+### Stok örneğini dene
+
+İzole bir Docker konteynerinde iki sentetik yedek üret. İkisi de geri yüklenir. İki testi de yalnızca eksiksiz yedek geçer.
+
+```sh
+demo_dir=$(mktemp -d)
+node examples/make-inventory-dumps.mjs "$demo_dir/dumps"
+export RESTORELAB_STATE="$demo_dir/history"
+export DRILL_PROJECT_ID=inventory DRILL_APP_VERSION=1.0
+export DRILL_SQL_SUITE=examples/inventory-checks.json
+DRILL_BACKUP="$demo_dir/dumps/healthy.dump" DRILL_BACKUP_AT=2026-11-10T01:00:00Z \
+  node restorelab.mjs drill examples/sql-profile.mjs
+DRILL_BACKUP="$demo_dir/dumps/incomplete.dump" DRILL_BACKUP_AT=2026-11-11T01:00:00Z \
+  node restorelab.mjs drill examples/sql-profile.mjs
+node restorelab.mjs serve examples/sql-profile.mjs
+```
+
+İkinci tatbikat, ödenmiş siparişin rezervasyonu eksik olduğu için 1 koduyla çıkar. Son denenen ve son geçen yedeği panelde yan yana görebilirsin.
+
 ## Lisans
 
 [MIT](LICENSE)

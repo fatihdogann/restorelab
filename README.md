@@ -45,6 +45,39 @@ Use a lowercase, schema-qualified table name. The starter verifies that the tabl
 
 To go further, copy the [starter profile](examples/postgres-profile.mjs) and replace its table check with an invariant that matters to your application, such as an authenticated read or a cross-user access check. An `exercise` calls `restoreBackup` with the actual restore operation and returns explicit expected and observed results. Change the suite version when you change what the profile tests.
 
+## Test a business rule in your own backup
+
+Copy [the inventory suite](examples/inventory-checks.json) and replace its SQL expressions with rules your application depends on. For example, a paid order should have a stock reservation. Keep the environment variables from the previous section, add the suite path and run the SQL profile.
+
+```sh
+export DRILL_SQL_SUITE=/absolute/path/inventory-checks.json
+node restorelab.mjs drill examples/sql-profile.mjs
+RESTORELAB_LANG=en node restorelab.mjs serve examples/sql-profile.mjs
+```
+
+Each check has a `label`, an optional `english` label and one boolean `sql` expression without semicolons. Up to 20 checks run in separate read-only transactions with a five-second query timeout. Only `true` passes. False, NULL and SQL errors fail without recording query text or row data. Changing the checks or the Docker image name starts a new suite history. Use a pinned image digest if you need the same image across runs.
+
+The SQL profile skips original ownership and grants. It verifies data rules as the container's PostgreSQL admin. Use a custom profile with the application’s roles for authorization, sign-in, API or write checks.
+
+### Try the inventory example
+
+Generate two synthetic dumps in an isolated Docker container. Both restore. Only the healthy dump passes both checks.
+
+```sh
+demo_dir=$(mktemp -d)
+node examples/make-inventory-dumps.mjs "$demo_dir/dumps"
+export RESTORELAB_STATE="$demo_dir/history"
+export DRILL_PROJECT_ID=inventory DRILL_APP_VERSION=1.0
+export DRILL_SQL_SUITE=examples/inventory-checks.json
+DRILL_BACKUP="$demo_dir/dumps/healthy.dump" DRILL_BACKUP_AT=2026-11-10T01:00:00Z \
+  node restorelab.mjs drill examples/sql-profile.mjs
+DRILL_BACKUP="$demo_dir/dumps/incomplete.dump" DRILL_BACKUP_AT=2026-11-11T01:00:00Z \
+  node restorelab.mjs drill examples/sql-profile.mjs
+RESTORELAB_LANG=en node restorelab.mjs serve examples/sql-profile.mjs
+```
+
+The second drill exits with code 1 because the paid order has no reservation. Open the panel to see the newest tested dump and the newest passing dump side by side.
+
 ## Run it regularly
 
 Call `drill` from cron, a systemd timer, or CI. A failed drill exits nonzero and keeps its result. Set `RESTORELAB_STATE` to choose a private history directory. It defaults to `~/.local/state/restorelab`. The panel listens on loopback and reads this history.

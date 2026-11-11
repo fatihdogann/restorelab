@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Ödenmiş her siparişin stok rezervasyonu var",
+    "english": "Every paid order has a stock reservation",
+    "sql": "NOT EXISTS (SELECT 1 FROM public.orders AS o WHERE o.paid AND NOT EXISTS (SELECT 1 FROM public.reservations AS r WHERE r.order_id = o.id))"
+  },
+  {
+    "label": "Rezerve edilen miktar mevcut stoğu aşmıyor",
+    "english": "Reserved units do not exceed available stock",
+    "sql": "NOT EXISTS (SELECT 1 FROM public.stock AS s JOIN public.reservations AS r USING (sku) GROUP BY s.sku, s.available_units HAVING SUM(r.units) > s.available_units)"
+  }
+]
